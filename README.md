@@ -1,10 +1,13 @@
 # Beanstalkd Exporter
 
+[![Build Status](https://travis-ci.org/messagebird/beanstalkd_exporter.svg?branch=master)](https://travis-ci.org/messagebird/beanstalkd_exporter)
+
+
 Beanstalkd Exporter is a [beanstalkd](http://kr.github.io/beanstalkd/) stats exporter for [Prometheus](http://prometheus.io).
 
 ## How does it work?
 
-Every now and then a goroutine connects to a beanstalkd server and asks for stats. These stats are then stored in memory for later. 
+Every now and then a goroutine connects to a beanstalkd server and asks for stats. These stats are then stored in memory for later.
 
 Every now and then Prometheus requests for stats. We read those from memory and respond.
 
