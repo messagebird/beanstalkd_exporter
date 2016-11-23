@@ -4,14 +4,20 @@ Beanstalkd Exporter is a [beanstalkd](http://kr.github.io/beanstalkd/) stats exp
 
 ## How does it work?
 
-Every now and then a goroutine connects to a beanstalkd server and asks for stats. These stats are then stored in memory for later.
+Every now and then a goroutine connects to a beanstalkd server and asks for stats. These stats are then stored in memory for later. 
 
 Every now and then Prometheus requests for stats. We read those from memory and respond.
 
 ## Usage
 
+Running beanstalkd_exporter is as easy as executing `beanstalkd_exporter` on the command line. Two arguments are required: `-config` and `-mapping-config` (see below for what they need).
+```bash
+$ beanstalkd_exporter -config examples/servers.conf -mapping-config examples/mapping.conf
 ```
-Usage of ./bin/beanstalkd_exporter:
+Use the -h flag to get help information.
+```bash
+$ beanstalkd_exporter -h
+Usage of beanstalkd_exporter:
   -config string
     	A config file that has one server URI per line
   -listen-address string
