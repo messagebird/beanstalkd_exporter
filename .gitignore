@@ -5,6 +5,3 @@
 /lib/*.o
 /pkg
 /vendor/pkg
-
-mapping.conf
-servers.conf
