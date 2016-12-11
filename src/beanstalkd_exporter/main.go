@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -17,9 +16,9 @@ import (
 
 var (
 	listenAddress     = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
+	address           = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
 	pollEvery         = flag.Int("poll", 30, "The number of seconds that we poll the beanstalkd server for stats.")
 	logLevel          = flag.String("log.level", "warning", "The log level.")
-	config            = flag.String("config", "", "A config file that has one server URI per line")
 	mappingConfig     = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
 	sleepBetweenStats = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
 )
@@ -27,7 +26,6 @@ var (
 var (
 	mapper    *tubeMapper
 	pollMutex sync.Mutex
-	servers   []string
 )
 
 func poll(server string) {
@@ -205,16 +203,6 @@ func main() {
 	// print more info on log. like line number.
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	lines, err := ioutil.ReadFile(*config)
-	if err != nil {
-		log.Fatal("Error loading config:", err)
-	}
-	for _, line := range strings.Split(string(lines), "\n") {
-		if line != "" {
-			servers = append(servers, strings.Trim(line, " "))
-		}
-	}
-
 	mapper = &tubeMapper{}
 	if *mappingConfig != "" {
 		err := mapper.initFromFile(*mappingConfig)
@@ -225,14 +213,12 @@ func main() {
 	}
 
 	log.Printf("Listening on port %s .", *listenAddress)
-	log.Printf("Polling %v for stats every %d seconds", servers, *pollEvery)
+	log.Printf("Polling %s for stats every %d seconds", *address, *pollEvery)
 
 	ticker := time.NewTicker(time.Second * time.Duration(*pollEvery))
 	go func() {
 		for _ = range ticker.C {
-			for _, s := range servers {
-				go poll(s)
-			}
+			go poll(*address)
 		}
 	}()
 
