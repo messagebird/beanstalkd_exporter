@@ -15,12 +15,13 @@ import (
 )
 
 var (
-	listenAddress     = flag.String("listen-address", ":8080", "The address to listen on for HTTP requests.")
 	address           = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
 	pollEvery         = flag.Int("poll", 30, "The number of seconds that we poll the beanstalkd server for stats.")
 	logLevel          = flag.String("log.level", "warning", "The log level.")
 	mappingConfig     = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
 	sleepBetweenStats = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
+	listenAddress     = flag.String("web.listen-address", ":8080", "Address to listen on for web interface and telemetry.")
+	metricsPath       = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 )
 
 var (
@@ -222,6 +223,6 @@ func main() {
 		}
 	}()
 
-	http.Handle("/metrics", prometheus.Handler())
+	http.Handle(*metricsPath, prometheus.Handler())
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
