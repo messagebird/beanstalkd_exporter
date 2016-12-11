@@ -36,7 +36,7 @@ func poll(server string) {
 	// system stats
 	c, err := beanstalk.Dial("tcp", server)
 	if err != nil {
-		log.Printf("Error. Can't connect to beanstalk: %v", err)
+		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
 	}
 
 	if *logLevel == "debug" {
