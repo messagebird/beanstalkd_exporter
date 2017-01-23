@@ -1,0 +1,12 @@
+version: '2'
+services:
+  beanstalkd_exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    links:
+      - beanstalkd
+    ports:
+      - "8080:8080"
+  beanstalkd:
+    image: schickling/beanstalkd
