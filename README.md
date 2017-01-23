@@ -20,11 +20,9 @@ $ beanstalkd_exporter -config examples/servers.conf -mapping-config examples/map
 Use the -h flag to get help information.
 ```bash
 $ beanstalkd_exporter -h
-Usage of beanstalkd_exporter:
-  -config string
-    	A config file that has one server URI per line
-  -listen-address string
-    	The address to listen on for HTTP requests. (default ":8080")
+Usage of ./bin/beanstalkd_exporter:
+  -beanstalkd.address string
+    	Beanstalkd server address (default "localhost:11300")
   -log.level string
     	The log level. (default "warning")
   -mapping-config string
@@ -33,6 +31,10 @@ Usage of beanstalkd_exporter:
     	The number of seconds that we poll the beanstalkd server for stats. (default 30)
   -sleep-between-tube-stats int
     	The number of milliseconds to sleep between tube stats. (default 5000)
+  -web.listen-address string
+    	Address to listen on for web interface and telemetry. (default ":8080")
+  -web.telemetry-path string
+    	Path under which to expose metrics. (default "/metrics")
 ```
 
 ## Tube name mapping
