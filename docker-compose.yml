@@ -1,9 +1,10 @@
-version: '2'
+version: '3'
 services:
   beanstalkd_exporter:
     build:
       context: .
-      dockerfile: Dockerfile
+    command:
+      - -beanstalkd.address=beanstalkd:11300
     links:
       - beanstalkd
     ports:
