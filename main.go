@@ -69,12 +69,13 @@ func poll(server string) {
 			ConstLabels: prometheus.Labels{"instance": server},
 		})
 
-		metric, err := prometheus.RegisterOrGet(gauge)
+		err := prometheus.Register(gauge)
 		if err != nil {
-			log.Printf("Error calling RegisterOrGet: %v", err)
-		}
-		if metric != nil {
-			gauge = metric.(prometheus.Gauge)
+			if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+				gauge = are.ExistingCollector.(prometheus.Gauge)
+			} else {
+				log.Printf("Error registering gauge: %v", err)
+			}
 		}
 
 		iValue, _ := strconv.ParseFloat(value, 64)
@@ -151,12 +152,13 @@ func statTube(c *beanstalk.Conn, server string, tubeName string) {
 			Help: help,
 		}, allLabelNames)
 
-		metric, err := prometheus.RegisterOrGet(gaugeVec)
+		err := prometheus.Register(gaugeVec)
 		if err != nil {
-			log.Printf("Error calling RegisterOrGet: %v", err)
-		}
-		if metric != nil {
-			gaugeVec = metric.(*prometheus.GaugeVec)
+			if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+				gaugeVec = are.ExistingCollector.(*prometheus.GaugeVec)
+			} else {
+				log.Printf("Error registering gauge: %v", err)
+			}
 		}
 
 		gauge := gaugeVec.With(labels)
