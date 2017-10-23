@@ -39,6 +39,9 @@ type tubeMapper struct {
 	mappings  []tubeMapping
 	allLabels []string
 	mutex     sync.Mutex
+
+	configLoadsMetric   *prometheus.CounterVec
+	mappingsCountMetric prometheus.Gauge
 }
 
 type configLoadStates int
@@ -47,6 +50,26 @@ const (
 	searching configLoadStates = iota
 	tubeDefinition
 )
+
+func newTubeMapper() *tubeMapper {
+	return &tubeMapper{
+		configLoadsMetric: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "beanstalkd",
+				Subsystem: "exporter",
+				Name:      "config_reloads_total",
+				Help:      "The number of configuration reloads.",
+			},
+			[]string{"outcome"},
+		),
+		mappingsCountMetric: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: "beanstalkd",
+			Subsystem: "exporter",
+			Name:      "loaded_mappings_count",
+			Help:      "The number of configured metric mappings.",
+		}),
+	}
+}
 
 func (m *tubeMapper) initFromString(fileContents string) error {
 	lines := strings.Split(fileContents, "\n")
@@ -113,7 +136,7 @@ func (m *tubeMapper) initFromString(fileContents string) error {
 	}
 	m.allLabels = labelNames
 
-	mappingsCount.Set(float64(len(parsedMappings)))
+	m.mappingsCountMetric.Set(float64(len(parsedMappings)))
 
 	return nil
 }
