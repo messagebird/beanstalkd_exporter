@@ -105,7 +105,7 @@ func TestMetricMapper(t *testing.T) {
 		},
 	}
 
-	mapper := tubeMapper{}
+	mapper := newTubeMapper()
 	for i, scenario := range scenarios {
 		err := mapper.initFromString(scenario.config)
 		if err != nil && !scenario.configBad {
