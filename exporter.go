@@ -28,7 +28,7 @@ type Exporter struct {
 	scrapeConnectionErrorMetric prometheus.Counter
 	scrapeHistogramMetric       prometheus.Histogram
 
-	// use to collects all the erros asynchronously
+	// use to collects all the errors asynchronously
 	cherrs chan error
 }
 
@@ -194,7 +194,7 @@ func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheu
 	labels["instance"] = e.address
 
 	// be sure all labels are set
-	allLabelNames := append(mapper.getAllLabels(), "instance")
+	allLabelNames := append(mapper.getAllLabels(), "instance", "tube")
 	for _, l := range allLabelNames {
 		if labels[l] == "" {
 			labels[l] = ""
