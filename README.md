@@ -13,7 +13,7 @@ Every now and then Prometheus requests for stats. We read those from memory and 
 
 ## Usage
 
-Running beanstalkd_exporter is as easy as executing `beanstalkd_exporter` on the command line. Two arguments are required: `-config` and `-mapping-config` (see below for what they need).
+Running beanstalkd_exporter is as easy as executing `beanstalkd_exporter` on the command line.  One argument is required: `-mapping-config` (see below for what it needs).
 ```bash
 $ beanstalkd_exporter -config examples/servers.conf -mapping-config examples/mapping.conf
 ```
