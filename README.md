@@ -7,17 +7,26 @@ Beanstalkd Exporter is a [beanstalkd](http://kr.github.io/beanstalkd/) stats exp
 
 ## How does it work?
 
-Every now and then a goroutine connects to a beanstalkd server and asks for stats. These stats are then stored in memory for later.
+Every now and then, Prometheus will request a "scrape" of metrics from
+this application via an HTTP request to /metrics. During this scrape
+request the exporter will connect to beanstalk and ask for stats. Stats
+are fetched for the whole instance and for each individual tube.
 
-Every now and then Prometheus requests for stats. We read those from memory and respond.
+If you have many tubes and fetching stats one-by-one takes longer than
+your allowed scrape duration configured in prometheus, you can increase
+the number of concurrent tube stats workers via the
+`-num-tube-stat-workers` flag, to parallelize the work required.
 
 ## Usage
 
 Running beanstalkd_exporter is as easy as executing `beanstalkd_exporter` on the command line. Two arguments are required: `-config` and `-mapping-config` (see below for what they need).
+
 ```bash
 $ beanstalkd_exporter -config examples/servers.conf -mapping-config examples/mapping.conf
 ```
+
 Use the -h flag to get help information.
+
 ```bash
 $ beanstalkd_exporter -h
 Usage of ./bin/beanstalkd_exporter:
@@ -31,6 +40,8 @@ Usage of ./bin/beanstalkd_exporter:
     	The number of seconds that we poll the beanstalkd server for stats. (default 30)
   -sleep-between-tube-stats int
     	The number of milliseconds to sleep between tube stats. (default 5000)
+  -num-tube-stat-workers int
+    	The number of concurrent workers to use to fetch tube stats. (default 1)
   -web.listen-address string
     	Address to listen on for web interface and telemetry. (default ":8080")
   -web.telemetry-path string
