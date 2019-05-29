@@ -159,6 +159,7 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s ListTubes()", e.address)
 	}
+
 	// stat every tube
 	tubes, err := c.ListTubes()
 	if err != nil {
@@ -168,10 +169,42 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	}
 	e.scrapeCountMetric.WithLabelValues("success").Inc()
 
-	// for every tube
+	// spin out workers to fetch metrics for every tube
+	wg := &sync.WaitGroup{}
+	chtubes := make(chan string)
+	for i := 0; i < *numTubeStatWorkers; i++ {
+		go e.scrapeWorker(i, c, wg, f, chtubes)
+		wg.Add(1)
+	}
+
+	// queue up tubes to be fetched
 	for _, name := range tubes {
+		chtubes <- name
+	}
+
+	// wait for everything to finish
+	close(chtubes)
+	wg.Wait()
+}
+
+func (e *Exporter) scrapeWorker(i int, c *beanstalk.Conn, wg *sync.WaitGroup, f func(prometheus.Collector), ch <-chan string) {
+	defer wg.Done()
+
+	if *logLevel == "debug" {
+		log.Debugf("Debug: scrape worker %d started", i)
+	}
+
+	for name := range ch {
+		if *logLevel == "debug" {
+			log.Debugf("Debug: scrape worker %d fetching tube %s", i, name)
+		}
+
 		e.statTube(c, name, f)
 		time.Sleep(time.Duration(*sleepBetweenStats) * time.Millisecond)
+	}
+
+	if *logLevel == "debug" {
+		log.Debugf("Debug: scrape worker %d finished", i)
 	}
 }
 
@@ -186,7 +219,6 @@ func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheu
 		labels = mappedLabels
 		labels["tube"] = labels["name"]
 		delete(labels, "name")
-
 	} else {
 		labels = prometheus.Labels{"tube": tubeName}
 	}
