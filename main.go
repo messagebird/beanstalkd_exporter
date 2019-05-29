@@ -7,7 +7,7 @@ import (
 	"github.com/howeyc/fsnotify"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
+	"github.com/prometheus/common/log"
 )
 
 var (
@@ -62,7 +62,7 @@ func main() {
 	flag.Parse()
 
 	if *logLevel == "debug" {
-		log.SetLevel(log.DebugLevel)
+		log.Base().SetLevel("debug")
 	}
 
 	mapper = newTubeMapper()

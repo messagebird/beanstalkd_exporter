@@ -9,7 +9,7 @@ import (
 
 	"github.com/kr/beanstalk"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+	"github.com/prometheus/common/log"
 )
 
 type Exporter struct {
