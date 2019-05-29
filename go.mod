@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/client_model v0.0.0-20170216185247-6f3806018612 // indirect
 	github.com/prometheus/common v0.0.0-20171006141418-1bab55dd05db
 	github.com/prometheus/procfs v0.0.0-20171017214025-a6e9df898b13 // indirect
-	github.com/sirupsen/logrus v1.4.2 // indirect
+	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58 // indirect
 	golang.org/x/sys v0.0.0-20190523142557-0e01d883c5c5 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
