@@ -1,13 +1,18 @@
-FROM golang:alpine
+FROM golang:alpine as build-env
 
-RUN apk add --no-cache --virtual git && \
-    go-wrapper download github.com/messagebird/beanstalkd_exporter && \
-    cp -v $GOPATH/bin/beanstalkd_exporter /usr/local/bin/beanstalkd_exporter && \
-    rm -rvf $GOPATH && \
-    apk del git
+RUN apk add git
 
+# Copy source + vendor
+COPY . /go/src/github.com/messagebird/beanstalkd_exporter
+WORKDIR /go/src/github.com/messagebird/beanstalkd_exporter
+
+# Build
+ENV GOPATH=/go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=off go build -v -a -ldflags "-s -w" -o /go/bin/beanstalkd_exporter .
+
+# Build mininal image with compiled app
+FROM scratch
 COPY examples/ /etc/beanstalkd_exporter/
-
-EXPOSE 8080
+COPY --from=build-env /go/bin/beanstalkd_exporter /usr/bin/beanstalkd_exporter
 ENTRYPOINT ["beanstalkd_exporter"]
-CMD ["-beanstalkd.address", "beanstalkd:11300", "-mapping-config", "/etc/beanstalkd_exporter/mapping.conf"]
+CMD ["-beanstalkd.address", "beanstalkd:11300"]

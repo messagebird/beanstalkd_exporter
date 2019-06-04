@@ -11,12 +11,13 @@ import (
 )
 
 var (
-	address           = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
-	logLevel          = flag.String("log.level", "warning", "The log level.")
-	mappingConfig     = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
-	sleepBetweenStats = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
-	listenAddress     = flag.String("web.listen-address", ":8080", "Address to listen on for web interface and telemetry.")
-	metricsPath       = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	address            = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
+	logLevel           = flag.String("log.level", "warning", "The log level.")
+	mappingConfig      = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
+	sleepBetweenStats  = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
+	numTubeStatWorkers = flag.Int("num-tube-stat-workers", 1, "The number of concurrent workers to use to fetch tube stats.")
+	listenAddress      = flag.String("web.listen-address", ":8080", "Address to listen on for web interface and telemetry.")
+	metricsPath        = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 )
 
 var (
@@ -60,6 +61,10 @@ func watchConfig(fileName string, mapper *tubeMapper) {
 func main() {
 	flag.Parse()
 
+	if *logLevel == "debug" {
+		log.Base().SetLevel("debug")
+	}
+
 	mapper = newTubeMapper()
 	if *mappingConfig != "" {
 		err := mapper.initFromFile(*mappingConfig)
@@ -78,14 +83,18 @@ func main() {
 	))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
-             <head><title>Beanstalkd Exporter</title></head>
-             <body>
-             <h1>Beanstalkd Exporter</h1>
-             <p><a href='` + *metricsPath + `'>Metrics</a></p>
-             </body>
-             </html>`))
+		w.Write([]byte(`
+			<html>
+              <head><title>Beanstalkd Exporter</title></head>
+              <body>
+                <h1>Beanstalkd Exporter</h1>
+                <p><a href='` + *metricsPath + `'>Metrics</a></p>
+              </body>
+            </html>
+		`),
+		)
 	})
+
 	log.Warnf("Listening on port %s .", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
