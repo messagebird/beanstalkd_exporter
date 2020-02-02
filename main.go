@@ -12,6 +12,8 @@ import (
 
 var (
 	address            = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
+	numberOfRetryForBs = flag.Int("beanstalkd.connection-retry", defaultnOfBsConnectionRetry, "A value that allows you to retry to connect beanstalk, if initial connection fails")
+	retryIntervalForBs = flag.Duration("beanstalkd.connection-retry-interval", retryBsConnectionInterval, "Sets a retry interval for beanstalk connection.")
 	logLevel           = flag.String("log.level", "warning", "The log level.")
 	mappingConfig      = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
 	sleepBetweenStats  = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
@@ -75,7 +77,11 @@ func main() {
 	}
 
 	registry = prometheus.NewRegistry()
-	registry.MustRegister(NewExporter(*address))
+	registry.MustRegister(NewExporter(
+		Address(*address),
+		NumberOfRetry(*numberOfRetryForBs),
+		RetrySleepTimer(*retryIntervalForBs)),
+	)
 
 	http.Handle(*metricsPath, promhttp.HandlerFor(
 		registry,

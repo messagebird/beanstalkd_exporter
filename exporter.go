@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,11 +13,14 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+const (
+	retryBsConnectionInterval   = 5 * time.Second
+	defaultnOfBsConnectionRetry = 2
+)
+
 type Exporter struct {
 	// use to protect against concurrent collection
 	mutex sync.RWMutex
-
-	address string
 
 	nameReplacer  *regexp.Regexp
 	labelReplacer *regexp.Regexp
@@ -28,15 +32,46 @@ type Exporter struct {
 	scrapeConnectionErrorMetric prometheus.Counter
 	scrapeHistogramMetric       prometheus.Histogram
 
+	config Config
+
 	// use to collects all the errors asynchronously
 	cherrs chan error
 }
 
-func NewExporter(address string) *Exporter {
-	cherrs := make(chan error)
-	exporter := &Exporter{
-		address: address,
+type Config struct {
+	address         string
+	numberOfRetry   int
+	retrySleepTimer time.Duration
+}
 
+type Option func(config *Config)
+
+func Address(address string) Option {
+	return func(c *Config) {
+		c.address = address
+	}
+}
+
+func NumberOfRetry(nOfretry int) Option {
+	return func(c *Config) {
+		c.numberOfRetry = nOfretry
+	}
+}
+
+func RetrySleepTimer(retrySleepTimer time.Duration) Option {
+	return func(c *Config) {
+		c.retrySleepTimer = retrySleepTimer
+	}
+}
+
+func NewExporter(opts ...Option) *Exporter {
+	cherrs := make(chan error)
+	config := Config{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+	exporter := &Exporter{
+		config: config,
 		scrapeCountMetric: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: "beanstalkd",
@@ -106,23 +141,40 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	mapper.mappingsCountMetric.Collect(ch)
 }
 
+func (e *Exporter) retryToDialBeanstalk() (*beanstalk.Conn, error) {
+	for i := 0; i < e.config.numberOfRetry; i++ {
+		c, err := beanstalk.Dial("tcp", e.config.address)
+		if err == nil {
+			return c, nil
+		}
+		e.scrapeConnectionErrorMetric.Inc()
+		log.Errorf("Error. Can't connect to beanstalk: %v retrying", err)
+		time.Sleep(e.config.retrySleepTimer)
+	}
+	return nil, fmt.Errorf(" %d connection retry was failed. skipping current stats", e.config.numberOfRetry)
+}
+
 // scrape retrieves all the available metrics and invoke the given callback on each of them.
 func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	start := time.Now()
 	defer func() {
 		e.scrapeHistogramMetric.Observe(time.Since(start).Seconds())
 	}()
-
 	// system stats
-	c, err := beanstalk.Dial("tcp", e.address)
+	c, err := beanstalk.Dial("tcp", e.config.address)
 	if err != nil {
 		e.scrapeConnectionErrorMetric.Inc()
-		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
-		return
+		log.Errorf("Error. Can't connect to beanstalk: %v", err)
+		c, err = e.retryToDialBeanstalk()
+		if err != nil {
+			log.Errorf("Error. can't connect to beanstalk: %v", err)
+			return
+		}
+
 	}
 
 	if *logLevel == "debug" {
-		log.Debugf("Debug: Calling %s stats()", e.address)
+		log.Debugf("Debug: Calling %s stats()", e.config.address)
 	}
 
 	stats, err := c.Stats()
@@ -147,7 +199,7 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 		gauge := prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:        name,
 			Help:        help,
-			ConstLabels: prometheus.Labels{"instance": e.address},
+			ConstLabels: prometheus.Labels{"instance": e.config.address},
 		})
 
 		iValue, _ := strconv.ParseFloat(value, 64)
@@ -157,7 +209,7 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	}
 
 	if *logLevel == "debug" {
-		log.Debugf("Debug: Calling %s ListTubes()", e.address)
+		log.Debugf("Debug: Calling %s ListTubes()", e.config.address)
 	}
 
 	// stat every tube
@@ -210,7 +262,7 @@ func (e *Exporter) scrapeWorker(i int, c *beanstalk.Conn, wg *sync.WaitGroup, f 
 
 func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheus.Collector)) {
 	if *logLevel == "debug" {
-		log.Debugf("Debug: Calling %s Tube{name: %s}.Stats()", e.address, tubeName)
+		log.Debugf("Debug: Calling %s Tube{name: %s}.Stats()", e.config.address, tubeName)
 	}
 
 	var labels prometheus.Labels
@@ -223,7 +275,7 @@ func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheu
 		labels = prometheus.Labels{"tube": tubeName}
 	}
 
-	labels["instance"] = e.address
+	labels["instance"] = e.config.address
 
 	// be sure all labels are set
 	allLabelNames := append(mapper.getAllLabels(), "instance", "tube")

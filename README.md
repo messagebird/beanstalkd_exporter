@@ -33,6 +33,10 @@ $ beanstalkd_exporter -h
 Usage of ./bin/beanstalkd_exporter:
   -beanstalkd.address string
     	Beanstalkd server address (default "localhost:11300")
+  -beanstalkd.connection-retry int
+        A value that allows you to retry to connect beanstalk, if initial connection fails (default 2)
+  -beanstalkd.connection-retry-interval duration
+        Sets a retry interval for beanstalk connection. (default 5s)
   -log.level string
     	The log level. (default "warning")
   -mapping-config string
