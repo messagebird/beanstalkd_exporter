@@ -122,7 +122,7 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	}
 	defer func() {
 		if err := c.Close(); err != nil {
-			log.Warnf("unable to gracevully close the connection with beanstalkd: %v", err)
+			log.Warnf("unable to gracefully close the connection with beanstalkd: %v", err)
 		}
 	}()
 
