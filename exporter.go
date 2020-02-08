@@ -120,6 +120,11 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
 		return
 	}
+	defer func() {
+		if err := c.Close(); err != nil {
+			log.Warnf("unable to gracefully close the connection with beanstalkd: %v", err)
+		}
+	}()
 
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s stats()", e.address)
