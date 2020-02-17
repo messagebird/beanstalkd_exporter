@@ -124,6 +124,12 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 		return
 	}
 
+	if err := conn.SetReadDeadline(time.Now().Add(e.connectionTimeout)); err != nil {
+		e.scrapeConnectionErrorMetric.Inc()
+		log.Fatalf("Error. SetReadDeadline is failed %v", err)
+		return
+	}
+
 	c := beanstalk.NewConn(conn)
 	defer func() {
 		if err := c.Close(); err != nil {
