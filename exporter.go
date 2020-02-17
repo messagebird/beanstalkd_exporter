@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,6 +19,8 @@ type Exporter struct {
 
 	address string
 
+	connectionTimeout time.Duration
+
 	nameReplacer  *regexp.Regexp
 	labelReplacer *regexp.Regexp
 
@@ -32,11 +35,11 @@ type Exporter struct {
 	cherrs chan error
 }
 
-func NewExporter(address string) *Exporter {
+func NewExporter(address string, connectionTimeout time.Duration) *Exporter {
 	cherrs := make(chan error)
 	exporter := &Exporter{
-		address: address,
-
+		address:           address,
+		connectionTimeout: connectionTimeout,
 		scrapeCountMetric: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: "beanstalkd",
@@ -113,13 +116,15 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 		e.scrapeHistogramMetric.Observe(time.Since(start).Seconds())
 	}()
 
-	// system stats
-	c, err := beanstalk.Dial("tcp", e.address)
+	// opens a tcp connection with connection timeout.
+	conn, err := net.DialTimeout("tcp", e.address, e.connectionTimeout)
 	if err != nil {
 		e.scrapeConnectionErrorMetric.Inc()
 		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
 		return
 	}
+
+	c := beanstalk.NewConn(conn)
 	defer func() {
 		if err := c.Close(); err != nil {
 			log.Warnf("unable to gracefully close the connection with beanstalkd: %v", err)

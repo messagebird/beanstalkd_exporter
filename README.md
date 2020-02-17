@@ -33,6 +33,8 @@ $ beanstalkd_exporter -h
 Usage of ./bin/beanstalkd_exporter:
   -beanstalkd.address string
     	Beanstalkd server address (default "localhost:11300")
+  -beanstalkd.connection-timeout duration
+        Timeout value for tcp connection to Beanstalkd (default 1m30s)
   -log.level string
     	The log level. (default "warning")
   -mapping-config string
