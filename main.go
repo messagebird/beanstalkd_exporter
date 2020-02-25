@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"net/http"
-	"time"
 
 	"github.com/howeyc/fsnotify"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,7 +12,7 @@ import (
 
 var (
 	address            = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
-	connectionTimeout  = flag.Duration("beanstalkd.connection-timeout", 90*time.Second, "Timeout value for tcp connection to Beanstalkd")
+	connectionTimeout  = flag.Duration("beanstalkd.connection-timeout", 0, "Timeout value for tcp connection to Beanstalkd")
 	logLevel           = flag.String("log.level", "warning", "The log level.")
 	mappingConfig      = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
 	sleepBetweenStats  = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
@@ -75,9 +74,10 @@ func main() {
 		}
 		go watchConfig(*mappingConfig, mapper)
 	}
-
+	exporter := NewExporter(*address)
+	exporter.SetConnectionTimeout(*connectionTimeout)
 	registry = prometheus.NewRegistry()
-	registry.MustRegister(NewExporter(*address, *connectionTimeout))
+	registry.MustRegister(exporter)
 
 	http.Handle(*metricsPath, promhttp.HandlerFor(
 		registry,

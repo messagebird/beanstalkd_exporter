@@ -13,6 +13,10 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+const (
+	dialTimeout = 30 * time.Second
+)
+
 type Exporter struct {
 	// use to protect against concurrent collection
 	mutex sync.RWMutex
@@ -35,11 +39,10 @@ type Exporter struct {
 	cherrs chan error
 }
 
-func NewExporter(address string, connectionTimeout time.Duration) *Exporter {
+func NewExporter(address string) *Exporter {
 	cherrs := make(chan error)
 	exporter := &Exporter{
-		address:           address,
-		connectionTimeout: connectionTimeout,
+		address: address,
 		scrapeCountMetric: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: "beanstalkd",
@@ -77,6 +80,11 @@ func NewExporter(address string, connectionTimeout time.Duration) *Exporter {
 	}(exporter)
 
 	return exporter
+}
+
+// SetConnectionTimeout sets the connection timeout value
+func (e *Exporter) SetConnectionTimeout(timeout time.Duration) {
+	e.connectionTimeout = timeout
 }
 
 // Describe implements the prometheus.Collector interface, emits on the chan
@@ -117,16 +125,10 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	}()
 
 	// opens a tcp connection with connection timeout.
-	conn, err := net.DialTimeout("tcp", e.address, e.connectionTimeout)
+	conn, err := net.DialTimeout("tcp", e.address, dialTimeout)
 	if err != nil {
 		e.scrapeConnectionErrorMetric.Inc()
 		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
-		return
-	}
-
-	if err := conn.SetReadDeadline(time.Now().Add(e.connectionTimeout)); err != nil {
-		e.scrapeConnectionErrorMetric.Inc()
-		log.Fatalf("Error. SetReadDeadline is failed %v", err)
 		return
 	}
 
@@ -136,6 +138,14 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 			log.Warnf("unable to gracefully close the connection with beanstalkd: %v", err)
 		}
 	}()
+
+	if e.connectionTimeout != 0 {
+		if err := conn.SetReadDeadline(time.Now().Add(e.connectionTimeout)); err != nil {
+			e.scrapeConnectionErrorMetric.Inc()
+			log.Fatalf("Error. SetReadDeadline is failed %v", err)
+			return
+		}
+	}
 
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s stats()", e.address)
