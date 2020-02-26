@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,6 +20,7 @@ type Exporter struct {
 	// use to protect against concurrent collection
 	mutex sync.RWMutex
 
+	conn    *beanstalk.Conn
 	address string
 
 	connectionTimeout time.Duration
@@ -94,13 +94,29 @@ func (e *Exporter) SetConnectionTimeout(timeout time.Duration) {
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	e.scrape(func(c prometheus.Collector) { c.Describe(ch) })
 
 	e.scrapeCountMetric.Describe(ch)
 	e.scrapeConnectionErrorMetric.Describe(ch)
 	e.scrapeHistogramMetric.Describe(ch)
 	mapper.configLoadsMetric.Describe(ch)
 	mapper.mappingsCountMetric.Describe(ch)
+
+	// TODO: move this init to the NewExporter
+	// if we release a new major version.
+	if e.conn == nil {
+		conn, err := newLazyConn(e.address, dialTimeout, e.connectionTimeout)
+		if err != nil {
+			e.scrapeConnectionErrorMetric.Inc()
+			log.Warnf("unable to connect to beanstalkd: %s", err)
+			return
+		}
+		e.conn = beanstalk.NewConn(conn)
+	}
+
+	collectors := e.scrape()
+	for _, collector := range collectors {
+		collector.Describe(ch)
+	}
 }
 
 // Collect implements the prometheus.Collector interface, emits on the chan all
@@ -108,57 +124,52 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	e.scrape(func(c prometheus.Collector) { c.Collect(ch) })
 
 	e.scrapeCountMetric.Collect(ch)
 	e.scrapeConnectionErrorMetric.Collect(ch)
 	e.scrapeHistogramMetric.Collect(ch)
 	mapper.configLoadsMetric.Collect(ch)
 	mapper.mappingsCountMetric.Collect(ch)
+
+	// TODO: move this init to the NewExporter
+	// if we release a new major version.
+	if e.conn == nil {
+		conn, err := newLazyConn(e.address, dialTimeout, e.connectionTimeout)
+		if err != nil {
+			e.scrapeConnectionErrorMetric.Inc()
+			log.Warnf("unable to connect to beanstalkd: %s", err)
+			return
+		}
+		e.conn = beanstalk.NewConn(conn)
+	}
+
+	collectors := e.scrape()
+	for _, collector := range collectors {
+		log.Debug(collectors)
+		collector.Collect(ch)
+	}
 }
 
 // scrape retrieves all the available metrics and invoke the given callback on each of them.
-func (e *Exporter) scrape(f func(prometheus.Collector)) {
+func (e *Exporter) scrape() []prometheus.Collector {
+	var collectors []prometheus.Collector
 	start := time.Now()
 	defer func() {
 		e.scrapeHistogramMetric.Observe(time.Since(start).Seconds())
 	}()
 
-	// opens a tcp connection with connection timeout.
-	conn, err := net.DialTimeout("tcp", e.address, dialTimeout)
-	if err != nil {
-		e.scrapeConnectionErrorMetric.Inc()
-		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
-		return
-	}
-
-	c := beanstalk.NewConn(conn)
-	defer func() {
-		if err := c.Close(); err != nil {
-			log.Warnf("unable to gracefully close the connection with beanstalkd: %v", err)
-		}
-	}()
-
-	if e.connectionTimeout != 0 {
-		if err := conn.SetReadDeadline(time.Now().Add(e.connectionTimeout)); err != nil {
-			e.scrapeConnectionErrorMetric.Inc()
-			log.Fatalf("Error. SetReadDeadline is failed %v", err)
-			return
-		}
-	}
-
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s stats()", e.address)
 	}
 
-	stats, err := c.Stats()
+	stats, err := e.conn.Stats()
 	if err != nil {
+		e.conn = nil
 		log.Errorf("Error requesting Stats(): %v", err)
 		e.scrapeCountMetric.WithLabelValues("failure").Inc()
-		return
+		return collectors
 	}
 	e.scrapeCountMetric.WithLabelValues("success").Inc()
-
 	for key, value := range stats {
 		// ignore these stats
 		if key == "hostname" || key == "id" || key == "pid" {
@@ -178,8 +189,7 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 
 		iValue, _ := strconv.ParseFloat(value, 64)
 		gauge.Set(iValue)
-
-		f(gauge)
+		collectors = append(collectors, gauge)
 	}
 
 	if *logLevel == "debug" {
@@ -187,54 +197,51 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 	}
 
 	// stat every tube
-	tubes, err := c.ListTubes()
+	tubes, err := e.conn.ListTubes()
 	if err != nil {
 		log.Errorf("Error requesting ListTubes(): %v", err)
 		e.scrapeCountMetric.WithLabelValues("failure").Inc()
-		return
+		return collectors
 	}
 	e.scrapeCountMetric.WithLabelValues("success").Inc()
 
-	// spin out workers to fetch metrics for every tube
-	wg := &sync.WaitGroup{}
-	chtubes := make(chan string)
-	for i := 0; i < *numTubeStatWorkers; i++ {
-		go e.scrapeWorker(i, c, wg, f, chtubes)
-		wg.Add(1)
+	var outs []<-chan []prometheus.Collector
+	for i, tube := range tubes {
+		out := e.scrapeWorker(i, e.conn, tube)
+		outs = append(outs, out)
 	}
-
-	// queue up tubes to be fetched
-	for _, name := range tubes {
-		chtubes <- name
+	for _, out := range outs {
+		tubeCollectors := <-out
+		collectors = append(collectors, tubeCollectors...)
 	}
-
-	// wait for everything to finish
-	close(chtubes)
-	wg.Wait()
+	return collectors
 }
 
-func (e *Exporter) scrapeWorker(i int, c *beanstalk.Conn, wg *sync.WaitGroup, f func(prometheus.Collector), ch <-chan string) {
-	defer wg.Done()
+func (e *Exporter) scrapeWorker(i int, c *beanstalk.Conn, name string) <-chan []prometheus.Collector {
+	out := make(chan []prometheus.Collector)
 
-	if *logLevel == "debug" {
-		log.Debugf("Debug: scrape worker %d started", i)
-	}
+	go func() {
+		defer close(out)
+		if *logLevel == "debug" {
+			log.Debugf("Debug: scrape worker %d started", i)
+		}
 
-	for name := range ch {
 		if *logLevel == "debug" {
 			log.Debugf("Debug: scrape worker %d fetching tube %s", i, name)
 		}
 
-		e.statTube(c, name, f)
-		time.Sleep(time.Duration(*sleepBetweenStats) * time.Millisecond)
-	}
+		out <- e.statTube(c, name)
 
-	if *logLevel == "debug" {
-		log.Debugf("Debug: scrape worker %d finished", i)
-	}
+		if *logLevel == "debug" {
+			log.Debugf("Debug: scrape worker %d finished", i)
+		}
+	}()
+	return out
 }
 
-func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheus.Collector)) {
+func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string) []prometheus.Collector {
+	var collectors []prometheus.Collector
+
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s Tube{name: %s}.Stats()", e.address, tubeName)
 	}
@@ -264,7 +271,7 @@ func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheu
 	if err != nil {
 		log.Errorf("Error tubes stats: %v", err)
 		e.scrapeCountMetric.WithLabelValues("failure").Inc()
-		return
+		return collectors
 	}
 	e.scrapeCountMetric.WithLabelValues("success").Inc()
 
@@ -288,7 +295,7 @@ func (e *Exporter) statTube(c *beanstalk.Conn, tubeName string, f func(prometheu
 		gauge := gaugeVec.With(labels)
 		iValue, _ := strconv.ParseFloat(value, 64)
 		gauge.Set(iValue)
-
-		f(gauge)
+		collectors = append(collectors, gauge)
 	}
+	return collectors
 }
