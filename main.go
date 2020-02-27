@@ -12,6 +12,7 @@ import (
 
 var (
 	address            = flag.String("beanstalkd.address", "localhost:11300", "Beanstalkd server address")
+	connectionTimeout  = flag.Duration("beanstalkd.connection-timeout", 0, "Timeout value for tcp connection to Beanstalkd")
 	logLevel           = flag.String("log.level", "warning", "The log level.")
 	mappingConfig      = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
 	sleepBetweenStats  = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
@@ -73,9 +74,10 @@ func main() {
 		}
 		go watchConfig(*mappingConfig, mapper)
 	}
-
+	exporter := NewExporter(*address)
+	exporter.SetConnectionTimeout(*connectionTimeout)
 	registry = prometheus.NewRegistry()
-	registry.MustRegister(NewExporter(*address))
+	registry.MustRegister(exporter)
 
 	http.Handle(*metricsPath, promhttp.HandlerFor(
 		registry,

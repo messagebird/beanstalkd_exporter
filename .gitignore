@@ -5,3 +5,4 @@
 /lib/*.o
 /pkg
 /vendor/pkg
+.idea

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,11 +13,17 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+const (
+	dialTimeout = 30 * time.Second
+)
+
 type Exporter struct {
 	// use to protect against concurrent collection
 	mutex sync.RWMutex
 
 	address string
+
+	connectionTimeout time.Duration
 
 	nameReplacer  *regexp.Regexp
 	labelReplacer *regexp.Regexp
@@ -36,7 +43,6 @@ func NewExporter(address string) *Exporter {
 	cherrs := make(chan error)
 	exporter := &Exporter{
 		address: address,
-
 		scrapeCountMetric: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: "beanstalkd",
@@ -76,6 +82,11 @@ func NewExporter(address string) *Exporter {
 	return exporter
 }
 
+// SetConnectionTimeout sets the connection timeout value
+func (e *Exporter) SetConnectionTimeout(timeout time.Duration) {
+	e.connectionTimeout = timeout
+}
+
 // Describe implements the prometheus.Collector interface, emits on the chan
 // the descriptors of all the possible metrics.
 // Since it's impossible to know in advance the metrics that going to be
@@ -113,18 +124,28 @@ func (e *Exporter) scrape(f func(prometheus.Collector)) {
 		e.scrapeHistogramMetric.Observe(time.Since(start).Seconds())
 	}()
 
-	// system stats
-	c, err := beanstalk.Dial("tcp", e.address)
+	// opens a tcp connection with connection timeout.
+	conn, err := net.DialTimeout("tcp", e.address, dialTimeout)
 	if err != nil {
 		e.scrapeConnectionErrorMetric.Inc()
 		log.Fatalf("Error. Can't connect to beanstalk: %v", err)
 		return
 	}
+
+	c := beanstalk.NewConn(conn)
 	defer func() {
 		if err := c.Close(); err != nil {
 			log.Warnf("unable to gracefully close the connection with beanstalkd: %v", err)
 		}
 	}()
+
+	if e.connectionTimeout != 0 {
+		if err := conn.SetReadDeadline(time.Now().Add(e.connectionTimeout)); err != nil {
+			e.scrapeConnectionErrorMetric.Inc()
+			log.Fatalf("Error. SetReadDeadline is failed %v", err)
+			return
+		}
+	}
 
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s stats()", e.address)
