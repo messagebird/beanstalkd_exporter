@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,7 +21,7 @@ type Exporter struct {
 	// use to protect against concurrent collection
 	mutex sync.RWMutex
 
-	conn    *beanstalk.Conn
+	conn    io.ReadWriteCloser
 	address string
 
 	connectionTimeout time.Duration
@@ -110,10 +111,11 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 			log.Warnf("unable to connect to beanstalkd: %s", err)
 			return
 		}
-		e.conn = beanstalk.NewConn(conn)
+		e.conn = conn
 	}
 
-	collectors := e.scrape()
+	client := beanstalk.NewConn(e.conn)
+	collectors := e.scrape(client)
 	for _, collector := range collectors {
 		collector.Describe(ch)
 	}
@@ -140,18 +142,18 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			log.Warnf("unable to connect to beanstalkd: %s", err)
 			return
 		}
-		e.conn = beanstalk.NewConn(conn)
+		e.conn = conn
 	}
 
-	collectors := e.scrape()
+	client := beanstalk.NewConn(e.conn)
+	collectors := e.scrape(client)
 	for _, collector := range collectors {
-		log.Debug(collectors)
 		collector.Collect(ch)
 	}
 }
 
 // scrape retrieves all the available metrics and invoke the given callback on each of them.
-func (e *Exporter) scrape() []prometheus.Collector {
+func (e *Exporter) scrape(conn *beanstalk.Conn) []prometheus.Collector {
 	var collectors []prometheus.Collector
 	start := time.Now()
 	defer func() {
@@ -162,9 +164,8 @@ func (e *Exporter) scrape() []prometheus.Collector {
 		log.Debugf("Debug: Calling %s stats()", e.address)
 	}
 
-	stats, err := e.conn.Stats()
+	stats, err := conn.Stats()
 	if err != nil {
-		e.conn = nil
 		log.Errorf("Error requesting Stats(): %v", err)
 		e.scrapeCountMetric.WithLabelValues("failure").Inc()
 		return collectors
@@ -197,7 +198,7 @@ func (e *Exporter) scrape() []prometheus.Collector {
 	}
 
 	// stat every tube
-	tubes, err := e.conn.ListTubes()
+	tubes, err := conn.ListTubes()
 	if err != nil {
 		log.Errorf("Error requesting ListTubes(): %v", err)
 		e.scrapeCountMetric.WithLabelValues("failure").Inc()
@@ -207,7 +208,7 @@ func (e *Exporter) scrape() []prometheus.Collector {
 
 	var outs []<-chan []prometheus.Collector
 	for i, tube := range tubes {
-		out := e.scrapeWorker(i, e.conn, tube)
+		out := e.scrapeWorker(i, conn, tube)
 		outs = append(outs, out)
 	}
 	for _, out := range outs {

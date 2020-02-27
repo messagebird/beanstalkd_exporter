@@ -3,12 +3,14 @@ package main
 import (
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/prometheus/common/log"
 )
 
 type lazyConn struct {
+	m           sync.Mutex
 	conn        net.Conn
 	addr        string
 	dialTimeout time.Duration
@@ -50,6 +52,9 @@ func (l *lazyConn) withTimeout() net.Conn {
 // Read implements the io.Reader interface and attempt
 // to reconnect to beanstalk in case of io.EOF.
 func (l *lazyConn) Read(p []byte) (n int, err error) {
+	l.m.Lock()
+	defer l.m.Unlock()
+
 	if l.conn == nil {
 		if err := l.connect(); err != nil {
 			return 0, io.ErrUnexpectedEOF
@@ -69,6 +74,9 @@ func (l *lazyConn) Read(p []byte) (n int, err error) {
 // Write implements the io.Writer interface and attempt
 // to reconnect to beanstalk in case of io.EOF.
 func (l *lazyConn) Write(p []byte) (n int, err error) {
+	l.m.Lock()
+	defer l.m.Unlock()
+
 	if l.conn == nil {
 		if err := l.connect(); err != nil {
 			return 0, io.ErrClosedPipe
