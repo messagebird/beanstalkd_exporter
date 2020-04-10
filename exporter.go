@@ -38,9 +38,11 @@ type Exporter struct {
 
 	// use to collects all the errors asynchronously
 	cherrs chan error
+
+	ExportTubeStats bool
 }
 
-func NewExporter(address string) *Exporter {
+func NewExporter(address string, exportTubeStats bool) *Exporter {
 	cherrs := make(chan error)
 	exporter := &Exporter{
 		address: address,
@@ -71,6 +73,8 @@ func NewExporter(address string) *Exporter {
 		),
 
 		cherrs: cherrs,
+
+		ExportTubeStats: exportTubeStats,
 	}
 
 	go func(e *Exporter) {
@@ -195,6 +199,10 @@ func (e *Exporter) scrape(conn *beanstalk.Conn) []prometheus.Collector {
 
 	if *logLevel == "debug" {
 		log.Debugf("Debug: Calling %s ListTubes()", e.address)
+	}
+
+	if !e.ExportTubeStats {
+		return collectors
 	}
 
 	// stat every tube
