@@ -127,7 +127,6 @@ func (m *tubeMapper) initFromString(fileContents string) error {
 
 	// get the list of unique labels across all mappings
 	delete(allLabels, "name")
-	allLabels["tube"] = 1
 	labelNames := make([]string, len(allLabels))
 	i := 0
 	for k := range allLabels {
