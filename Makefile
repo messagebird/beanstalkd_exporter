@@ -200,6 +200,6 @@ deploy:
 	@echo "Creating kubernetes deployment at: ./artifacts/deployment.yaml"
 	@cp artifacts/deployment-template.yaml artifacts/deployment.yaml
 	VERSION=$(VERSION) ./hack/generate.sh artifacts/deployment.yaml
-	@kubectl --context=$(KUBE_CONTEXT) delete deploy -ncentral beanstalkd_exporter
-	@kubectl --context=$(KUBE_CONTEXT) apply -f artifacts/deployment.yaml || @kubectl --context=$(KUBE_CONTEXT) create -f artifacts/deployment.yaml
-	@kubectl --context=$(KUBE_CONTEXT) get pods -n central | grep beanstalkd_exporter
+	@echo "Create the deployment: kubectl create -f artifacts/deployment.yaml"
+	@echo "Create the service to scrap the exporter data: kubectl create -f artifacts/service.yaml"
+	@echo "Create the servicemonitor to scrap the service to get the data to prometheus: kubectl create -f artifacts/service-monitor.yaml"

@@ -28,12 +28,12 @@ if [ -z "${VERSION}" ]; then
     echo "VERSION not set, exiting"
     exit 1
 fi
-export SQSMV_VERSION=${VERSION}
+export BEANSTALK_EXPORTER_VERSION=${VERSION}
 
 echo "sourcing environment variables: ./.envs.sh"
 source ./.envs.sh
 
-BIN='SQSMV'
+BIN='BEANSTALK_EXPORTER'
 while IFS='=' read -r name value ; do
   if [[ $name == *"${BIN}_"* ]]; then
     if [ "$machine" = "Mac" ]; then
