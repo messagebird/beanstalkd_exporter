@@ -6,3 +6,8 @@
 /pkg
 /vendor/pkg
 .idea
+/.go
+/.push-*
+/.container-*
+/.dockerfile-*
+.envs.sh

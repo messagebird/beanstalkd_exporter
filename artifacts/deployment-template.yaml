@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: beanstalkd_exporter
+ namespace: central
+ labels:
+   app: beanstalkd_exporter
+spec:
+ replicas: 1
+ selector:
+   matchLabels:
+     app: beanstalkd_exporter
+ template:
+   metadata:
+     labels:
+       app: beanstalkd_exporter
+   spec:
+     tolerations:
+     - effect: NoExecute
+       operator: Exists
+     - effect: NoSchedule
+       operator: Exists
+     containers:
+     - name: beanstalkd_exporter
+       image: practodev/beanstalkd_exporter:{{ beanstalkd_exporter_VERSION }}
+       imagePullPolicy: Always
+       command:
+       - /beanstalkd_exporter
+       - run
+       resources:
+         limits:
+           cpu: 100m
+           memory: 100Mi
+         requests:
+           cpu: 10m
+           memory: 20Mi
