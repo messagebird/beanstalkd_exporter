@@ -19,6 +19,15 @@ the number of concurrent tube stats workers via the
 
 ## Usage
 
+How to build it?
+```
+make build
+```
+
+How to generate the deployment yamls?
+```
+make deploy
+```
 
 Running beanstalkd_exporter is as easy as executing `beanstalkd_exporter` on the command line. One argument is required: `-mapping-config` (see below for what it needs).
 
@@ -110,4 +119,3 @@ tube_current_jobs_ready{tube="incoming-emails",user_id="8882"}
 ## License
 
 beanstalkd_exporter is licensed under [The BSD 2-Clause License](http://opensource.org/licenses/BSD-2-Clause). Copyright (c) 2016, MessageBird
-
