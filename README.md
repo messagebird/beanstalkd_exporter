@@ -12,10 +12,7 @@ this application via an HTTP request to /metrics. During this scrape
 request the exporter will connect to beanstalk and ask for stats. Stats
 are fetched for the whole instance and for each individual tube.
 
-If you have many tubes and fetching stats one-by-one takes longer than
-your allowed scrape duration configured in prometheus, you can increase
-the number of concurrent tube stats workers via the
-`-num-tube-stat-workers` flag, to parallelize the work required.
+It is gonna create one worker per tube in order to fetch the stats.
 
 ## Usage
 
@@ -41,10 +38,6 @@ Usage of ./bin/beanstalkd_exporter:
     	A file that describes a mapping of tube names.
   -poll int
     	The number of seconds that we poll the beanstalkd server for stats. (default 30)
-  -sleep-between-tube-stats int
-    	The number of milliseconds to sleep between tube stats. (default 5000)
-  -num-tube-stat-workers int
-    	The number of concurrent workers to use to fetch tube stats. (default 1)
   -web.listen-address string
     	Address to listen on for web interface and telemetry. (default ":8080")
   -web.telemetry-path string
