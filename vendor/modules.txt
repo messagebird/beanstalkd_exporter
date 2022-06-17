@@ -21,19 +21,19 @@ github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.0.0-20170216185247-6f3806018612
 github.com/prometheus/client_model/go
 # github.com/prometheus/common v0.0.0-20171006141418-1bab55dd05db
-github.com/prometheus/common/log
 github.com/prometheus/common/expfmt
-github.com/prometheus/common/model
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/prometheus/common/log
+github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.0.0-20171017214025-a6e9df898b13
 github.com/prometheus/procfs
 github.com/prometheus/procfs/xfs
 # github.com/sirupsen/logrus v1.4.2
 github.com/sirupsen/logrus
 # golang.org/x/sys v0.0.0-20190523142557-0e01d883c5c5
-golang.org/x/sys/windows/svc/eventlog
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
+golang.org/x/sys/windows/svc/eventlog
 # gopkg.in/alecthomas/kingpin.v2 v2.2.6
 gopkg.in/alecthomas/kingpin.v2
