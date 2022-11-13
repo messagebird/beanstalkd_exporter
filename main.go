@@ -15,8 +15,6 @@ var (
 	connectionTimeout  = flag.Duration("beanstalkd.connection-timeout", 0, "Timeout value for tcp connection to Beanstalkd")
 	logLevel           = flag.String("log.level", "warning", "The log level.")
 	mappingConfig      = flag.String("mapping-config", "", "A file that describes a mapping of tube names.")
-	sleepBetweenStats  = flag.Int("sleep-between-tube-stats", 5000, "The number of milliseconds to sleep between tube stats.")
-	numTubeStatWorkers = flag.Int("num-tube-stat-workers", 1, "The number of concurrent workers to use to fetch tube stats.")
 	listenAddress      = flag.String("web.listen-address", ":8080", "Address to listen on for web interface and telemetry.")
 	metricsPath        = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 )
